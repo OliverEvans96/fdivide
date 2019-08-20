@@ -1,0 +1,28 @@
+
+stages:
+  - build
+  - deploy
+
+build-image:
+  stage: build
+  only:
+    refs:
+    - master
+    - dev
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+      # Tag images with git commit SHAs
+    - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/build/Dockerfile --destination $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA -v info
+
+deploy-k8s:
+  image: roffe/kubectl
+  stage: deploy
+  only:
+    refs:
+      - master
+      - dev
+  script:
+    - cat k8s/*.yaml | envsubst '$CI_COMMIT_SHORT_SHA' | kubectl apply -f -
