@@ -9,7 +9,7 @@ Split up a directory
 ```
 % fdivide --help
 fdivide
-Divide a regular files from a directory into subdirectories by number of files using symlinks.
+Divide regular files from a directory into subdirectories by number of files using symlinks.
 
 Usage:
     fdivide --size <dir-size> <input-dir> <output-dir>
