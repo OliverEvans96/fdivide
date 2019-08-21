@@ -15,8 +15,8 @@ const usage string = `fdivide
 Divide regular files from a directory into subdirectories by number of files using symlinks.
 
 Usage:
-    fdivide --size <dir-size> <input-dir> <output-dir>
-    fdivide --into <num-dirs> <input-dir> <output-dir>
+    fdivide --size <dir-size> <input-dir> <output-dir> [--verbose]
+    fdivide --into <num-dirs> <input-dir> <output-dir> [--verbose]
 `
 
 func main() {
@@ -25,6 +25,10 @@ func main() {
 		panic(err)
 	}
 	bySize, err := opts.Bool("--size")
+	if err != nil {
+		panic(err)
+	}
+	verbose, err := opts.Bool("--verbose")
 	if err != nil {
 		panic(err)
 	}
@@ -41,14 +45,14 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		divideBySize(dirSize, inputDir, outputDir)
+		divideBySize(dirSize, inputDir, outputDir, verbose)
 
 	} else {
 		numDirs, err := opts.Int("<num-dirs>")
 		if err != nil {
 			panic(err)
 		}
-		divideInto(numDirs, inputDir, outputDir)
+		divideInto(numDirs, inputDir, outputDir, verbose)
 	}
 }
 
@@ -73,18 +77,18 @@ func getAllFilenames(inputDir string) []string {
 	return regularFilenames
 }
 
-func divideBySize(dirSize int, inputDir string, outputDir string) {
+func divideBySize(dirSize int, inputDir string, outputDir string, verbose bool) {
 	filenames := getAllFilenames(inputDir)
 	numFiles := len(filenames)
 	numDirs := int(math.Ceil(float64(numFiles) / float64(dirSize)))
-	divide(numDirs, dirSize, numFiles, filenames, inputDir, outputDir)
+	divide(numDirs, dirSize, numFiles, filenames, inputDir, outputDir, verbose)
 }
 
-func divideInto(numDirs int, inputDir string, outputDir string) {
+func divideInto(numDirs int, inputDir string, outputDir string, verbose bool) {
 	filenames := getAllFilenames(inputDir)
 	numFiles := len(filenames)
 	dirSize := int(math.Ceil(float64(numFiles) / float64(numDirs)))
-	divide(numDirs, dirSize, numFiles, filenames, inputDir, outputDir)
+	divide(numDirs, dirSize, numFiles, filenames, inputDir, outputDir, verbose)
 }
 
 func getDirNameTemplate(numDirs int) string {
@@ -93,7 +97,7 @@ func getDirNameTemplate(numDirs int) string {
 	return fmt.Sprintf("%%0%dd", dirnameDigits)
 }
 
-func divide(numDirs int, dirSize int, numFiles int, filenames []string, inputDir string, outputDir string) {
+func divide(numDirs int, dirSize int, numFiles int, filenames []string, inputDir string, outputDir string, verbose bool) {
 	dirnameTemplate := getDirNameTemplate(numDirs)
 	inputDirAbsPath, err := filepath.Abs(inputDir)
 	if err != nil {
@@ -111,6 +115,9 @@ func divide(numDirs int, dirSize int, numFiles int, filenames []string, inputDir
 			filename := filenames[fileNum]
 			oldpath := path.Join(inputDirAbsPath, filename)
 			newpath := path.Join(subdirPath, filename)
+			if verbose {
+				fmt.Printf("%s -> %s\n", oldpath, newpath)
+			}
 			os.Symlink(oldpath, newpath)
 		}
 	}
