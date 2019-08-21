@@ -1,6 +1,8 @@
+# fdivide
+
 Use symlinks to divide files from one directory into multiple directories, and recombine as well.
 
-# Usage
+## Usage
 
 Split up a directory
 
@@ -25,7 +27,7 @@ Usage:
     fcombine <input-parent-dir> <output-dir>
 ```
 
-# Examples
+## Examples
 
 Create some empty files
 
