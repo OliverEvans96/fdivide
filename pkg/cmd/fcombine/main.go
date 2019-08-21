@@ -38,37 +38,62 @@ func main() {
 	combine(inputDir, outputDir, verbose)
 }
 
-func getAllFilenames(inputDir string) []string {
-	allFiles, err := ioutil.ReadDir(inputDir)
+func ls(dirPath string) []string {
+	var entryNames []string
+	entries, err := ioutil.ReadDir(dirPath)
 	if err != nil {
 		panic(err)
 	}
+	for _, entry := range entries {
+		entryNames = append(entryNames, entry.Name())
+	}
+	return entryNames
+}
+
+func getAllFilenames(inputDir string) []string {
+	allEntrynames := ls(inputDir)
 	var allFilenames []string
-	for _, file := range allFiles {
-		if !file.IsDir() {
-			allFilenames = append(allFilenames, file.Name())
+	for _, entryName := range allEntrynames {
+		entryPath := path.Join(inputDir, entryName)
+		// Use Stat instead of Lstat to follow symlinks
+		entryInfo, err := os.Stat(entryPath)
+		if err != nil {
+			panic(err)
+		}
+		if !entryInfo.IsDir() {
+			allFilenames = append(allFilenames, entryInfo.Name())
 		}
 	}
 	return allFilenames
 }
 
 func getDirnames(inputDir string) []string {
-	allFiles, err := ioutil.ReadDir(inputDir)
-	if err != nil {
-		panic(err)
-	}
+	entryNames := ls(inputDir)
 	var dirnames []string
-	for _, file := range allFiles {
-		if file.IsDir() {
-			dirnames = append(dirnames, file.Name())
+	for _, entryName := range entryNames {
+		entryPath := path.Join(inputDir, entryName)
+		// Use Stat instead of Lstat to follow symlinks
+		entryInfo, err := os.Stat(entryPath)
+		if err != nil {
+			panic(err)
+		}
+		if entryInfo.IsDir() {
+			dirnames = append(dirnames, entryInfo.Name())
 		}
 	}
 	return dirnames
 }
 
 func combine(inputDir string, outputDir string, verbose bool) {
-	subdirnames := getDirnames(inputDir)
-	inputDirAbsPath, err := filepath.Abs(inputDir)
+	inputDirTruePath, err := filepath.EvalSymlinks(inputDir)
+	if err != nil {
+		panic(err)
+	}
+	inputDirAbsPath, err := filepath.Abs(inputDirTruePath)
+	if err != nil {
+		panic(err)
+	}
+	subdirnames := getDirnames(inputDirAbsPath)
 	if err != nil {
 		panic(err)
 	}
@@ -83,11 +108,15 @@ func combine(inputDir string, outputDir string, verbose bool) {
 		filenames := getAllFilenames(subdirPath)
 		for _, filename := range filenames {
 			oldpath := path.Join(subdirPath, filename)
+			trueOldpath, err := filepath.EvalSymlinks(oldpath)
+			if err != nil {
+				panic(err)
+			}
 			newpath := path.Join(outputDir, filename)
 			if verbose {
-				fmt.Printf("%s -> %s\n", oldpath, newpath)
+				fmt.Printf("%s -> %s\n", trueOldpath, newpath)
 			}
-			os.Symlink(oldpath, newpath)
+			os.Symlink(trueOldpath, newpath)
 		}
 	}
 }

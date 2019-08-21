@@ -63,18 +63,33 @@ func min(a, b int) int {
 	return b
 }
 
-func getAllFilenames(inputDir string) []string {
-	allFiles, err := ioutil.ReadDir(inputDir)
+func ls(dirPath string) []string {
+	var entryNames []string
+	entries, err := ioutil.ReadDir(dirPath)
 	if err != nil {
 		panic(err)
 	}
-	var regularFilenames []string
-	for _, file := range allFiles {
-		if !file.IsDir() {
-			regularFilenames = append(regularFilenames, file.Name())
+	for _, entry := range entries {
+		entryNames = append(entryNames, entry.Name())
+	}
+	return entryNames
+}
+
+func getAllFilenames(inputDir string) []string {
+	allEntrynames := ls(inputDir)
+	var allFilenames []string
+	for _, entryName := range allEntrynames {
+		entryPath := path.Join(inputDir, entryName)
+		// Use Stat instead of Lstat to follow symlinks
+		entryInfo, err := os.Stat(entryPath)
+		if err != nil {
+			panic(err)
+		}
+		if !entryInfo.IsDir() {
+			allFilenames = append(allFilenames, entryInfo.Name())
 		}
 	}
-	return regularFilenames
+	return allFilenames
 }
 
 func divideBySize(dirSize int, inputDir string, outputDir string, verbose bool) {
@@ -114,11 +129,15 @@ func divide(numDirs int, dirSize int, numFiles int, filenames []string, inputDir
 		for fileNum := dirSize * dirNum; fileNum < maxFileNumPlusOne; fileNum++ {
 			filename := filenames[fileNum]
 			oldpath := path.Join(inputDirAbsPath, filename)
+			trueOldpath, err := filepath.EvalSymlinks(oldpath)
+			if err != nil {
+				panic(err)
+			}
 			newpath := path.Join(subdirPath, filename)
 			if verbose {
-				fmt.Printf("%s -> %s\n", oldpath, newpath)
+				fmt.Printf("%s -> %s\n", trueOldpath, newpath)
 			}
-			os.Symlink(oldpath, newpath)
+			os.Symlink(trueOldpath, newpath)
 		}
 	}
 }
