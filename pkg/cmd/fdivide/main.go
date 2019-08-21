@@ -59,14 +59,14 @@ func min(a, b int) int {
 	return b
 }
 
-func getRegularFilenames(inputDir string) []string {
+func getAllFilenames(inputDir string) []string {
 	allFiles, err := ioutil.ReadDir(inputDir)
 	if err != nil {
 		panic(err)
 	}
 	var regularFilenames []string
 	for _, file := range allFiles {
-		if file.Mode().IsRegular() {
+		if !file.IsDir() {
 			regularFilenames = append(regularFilenames, file.Name())
 		}
 	}
@@ -74,14 +74,14 @@ func getRegularFilenames(inputDir string) []string {
 }
 
 func divideBySize(dirSize int, inputDir string, outputDir string) {
-	filenames := getRegularFilenames(inputDir)
+	filenames := getAllFilenames(inputDir)
 	numFiles := len(filenames)
 	numDirs := int(math.Ceil(float64(numFiles) / float64(dirSize)))
 	divide(numDirs, dirSize, numFiles, filenames, inputDir, outputDir)
 }
 
 func divideInto(numDirs int, inputDir string, outputDir string) {
-	filenames := getRegularFilenames(inputDir)
+	filenames := getAllFilenames(inputDir)
 	numFiles := len(filenames)
 	dirSize := int(math.Ceil(float64(numFiles) / float64(numDirs)))
 	divide(numDirs, dirSize, numFiles, filenames, inputDir, outputDir)
