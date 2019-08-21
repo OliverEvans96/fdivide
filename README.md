@@ -1,5 +1,3 @@
-# fdivide
-
 Use symlinks to divide files from one directory into multiple directories, and recombine as well.
 
 # Usage
