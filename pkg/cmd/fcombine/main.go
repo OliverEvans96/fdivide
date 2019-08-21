@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -13,11 +14,15 @@ const usage string = `fcombine
 Combine files from sibiling subdirectories into a single output directory using symlinks.
 
 Usage:
-    fcombine <input-parent-dir> <output-dir>
+    fcombine <input-parent-dir> <output-dir> [--verbose]
 `
 
 func main() {
 	opts, err := docopt.ParseDoc(usage)
+	if err != nil {
+		panic(err)
+	}
+	verbose, err := opts.Bool("--verbose")
 	if err != nil {
 		panic(err)
 	}
@@ -30,7 +35,7 @@ func main() {
 		panic(err)
 	}
 
-	combine(inputDir, outputDir)
+	combine(inputDir, outputDir, verbose)
 }
 
 func getAllFilenames(inputDir string) []string {
@@ -61,7 +66,7 @@ func getDirnames(inputDir string) []string {
 	return dirnames
 }
 
-func combine(inputDir string, outputDir string) {
+func combine(inputDir string, outputDir string, verbose bool) {
 	subdirnames := getDirnames(inputDir)
 	inputDirAbsPath, err := filepath.Abs(inputDir)
 	if err != nil {
@@ -79,6 +84,9 @@ func combine(inputDir string, outputDir string) {
 		for _, filename := range filenames {
 			oldpath := path.Join(subdirPath, filename)
 			newpath := path.Join(outputDir, filename)
+			if verbose {
+				fmt.Printf("%s -> %s\n", oldpath, newpath)
+			}
 			os.Symlink(oldpath, newpath)
 		}
 	}
