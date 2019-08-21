@@ -40,7 +40,9 @@ func getAllFilenames(inputDir string) []string {
 	}
 	var allFilenames []string
 	for _, file := range allFiles {
-		allFilenames = append(allFilenames, file.Name())
+		if !file.IsDir() {
+			allFilenames = append(allFilenames, file.Name())
+		}
 	}
 	return allFilenames
 }
