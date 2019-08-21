@@ -38,7 +38,7 @@ Create some empty files
 01  02  03  04  05  06  07  08  09  10  11  12  13  14  15  16  17  18  19  20
 ```
 
-Split them into tree directories
+Split them into three directories
 ```
 % fdivide --into 3 initial divided-into
 % ls divided-into -lR
