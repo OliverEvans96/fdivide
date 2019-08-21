@@ -1,12 +1,12 @@
 package main
 
 import (
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 
 	"github.com/docopt/docopt-go"
-	"gitlab.com/lavo-nutrition/fdivide/pkg/utils"
 )
 
 const usage string = `fcombine
@@ -33,8 +33,34 @@ func main() {
 	combine(inputDir, outputDir)
 }
 
+func getAllFilenames(inputDir string) []string {
+	allFiles, err := ioutil.ReadDir(inputDir)
+	if err != nil {
+		panic(err)
+	}
+	var allFilenames []string
+	for _, file := range allFiles {
+		allFilenames = append(allFilenames, file.Name())
+	}
+	return allFilenames
+}
+
+func getDirnames(inputDir string) []string {
+	allFiles, err := ioutil.ReadDir(inputDir)
+	if err != nil {
+		panic(err)
+	}
+	var dirnames []string
+	for _, file := range allFiles {
+		if file.IsDir() {
+			dirnames = append(dirnames, file.Name())
+		}
+	}
+	return dirnames
+}
+
 func combine(inputDir string, outputDir string) {
-	subdirnames := utils.GetDirnames(inputDir)
+	subdirnames := getDirnames(inputDir)
 	inputDirAbsPath, err := filepath.Abs(inputDir)
 	if err != nil {
 		panic(err)
@@ -47,11 +73,11 @@ func combine(inputDir string, outputDir string) {
 
 	for _, subdirname := range subdirnames {
 		subdirPath := path.Join(inputDirAbsPath, subdirname)
-		filenames := utils.GetAllFilenames(subdirPath)
+		filenames := getAllFilenames(subdirPath)
 		for _, filename := range filenames {
 			oldpath := path.Join(subdirPath, filename)
 			newpath := path.Join(outputDir, filename)
-			utils.Symlink(oldpath, newpath)
+			os.Symlink(oldpath, newpath)
 		}
 	}
 }

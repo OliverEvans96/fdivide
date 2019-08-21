@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"math"
 	"os"
 	"path"
 	"path/filepath"
 
 	"github.com/docopt/docopt-go"
-	"gitlab.com/lavo-nutrition/fdivide/pkg/utils"
 )
 
 const usage string = `fdivide
@@ -52,15 +52,36 @@ func main() {
 	}
 }
 
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func getRegularFilenames(inputDir string) []string {
+	allFiles, err := ioutil.ReadDir(inputDir)
+	if err != nil {
+		panic(err)
+	}
+	var regularFilenames []string
+	for _, file := range allFiles {
+		if file.Mode().IsRegular() {
+			regularFilenames = append(regularFilenames, file.Name())
+		}
+	}
+	return regularFilenames
+}
+
 func divideBySize(dirSize int, inputDir string, outputDir string) {
-	filenames := utils.GetRegularFilenames(inputDir)
+	filenames := getRegularFilenames(inputDir)
 	numFiles := len(filenames)
 	numDirs := int(math.Ceil(float64(numFiles) / float64(dirSize)))
 	divide(numDirs, dirSize, numFiles, filenames, inputDir, outputDir)
 }
 
 func divideInto(numDirs int, inputDir string, outputDir string) {
-	filenames := utils.GetRegularFilenames(inputDir)
+	filenames := getRegularFilenames(inputDir)
 	numFiles := len(filenames)
 	dirSize := int(math.Ceil(float64(numFiles) / float64(numDirs)))
 	divide(numDirs, dirSize, numFiles, filenames, inputDir, outputDir)
@@ -85,12 +106,12 @@ func divide(numDirs int, dirSize int, numFiles int, filenames []string, inputDir
 		if err != nil {
 			panic(err)
 		}
-		maxFileNumPlusOne := int(utils.Min(numFiles, dirSize*(dirNum+1)))
+		maxFileNumPlusOne := int(min(numFiles, dirSize*(dirNum+1)))
 		for fileNum := dirSize * dirNum; fileNum < maxFileNumPlusOne; fileNum++ {
 			filename := filenames[fileNum]
 			oldpath := path.Join(inputDirAbsPath, filename)
 			newpath := path.Join(subdirPath, filename)
-			utils.Symlink(oldpath, newpath)
+			os.Symlink(oldpath, newpath)
 		}
 	}
 }
