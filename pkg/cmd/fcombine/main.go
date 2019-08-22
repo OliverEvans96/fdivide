@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -14,18 +15,48 @@ const usage string = `fcombine
 Combine files from sibiling subdirectories into a single output directory using symlinks.
 
 Usage:
-    fcombine <input-parent-dir> <output-dir> [--verbose]
+    fcombine [--link | --copy | --move] <input-parent-dir> <output-dir> [options]
+
+Options:
+    --link               Link files (default)
+    --copy               Copy files
+    --move               Move files
+    --follow             Follow symlinks to source
+    --verbose, -v        Verbose logging
 `
+
+type Method string
+
+const (
+	Link Method = "Link"
+	Copy Method = "Copy"
+	Move Method = "Move"
+)
 
 func main() {
 	opts, err := docopt.ParseDoc(usage)
 	if err != nil {
 		panic(err)
 	}
-	verbose, err := opts.Bool("--verbose")
+
+	copyFlag, err := opts.Bool("--copy")
 	if err != nil {
 		panic(err)
 	}
+	moveFlag, err := opts.Bool("--move")
+	if err != nil {
+		panic(err)
+	}
+
+	var method Method
+	if copyFlag {
+		method = Copy
+	} else if moveFlag {
+		method = Move
+	} else {
+		method = Link
+	}
+
 	inputDir, err := opts.String("<input-parent-dir>")
 	if err != nil {
 		panic(err)
@@ -35,7 +66,17 @@ func main() {
 		panic(err)
 	}
 
-	combine(inputDir, outputDir, verbose)
+	followFlag, err := opts.Bool("--follow")
+	if err != nil {
+		panic(err)
+	}
+
+	verbose, err := opts.Bool("--verbose")
+	if err != nil {
+		panic(err)
+	}
+
+	combine(inputDir, outputDir, method, followFlag, verbose)
 }
 
 func ls(dirPath string) []string {
@@ -48,6 +89,31 @@ func ls(dirPath string) []string {
 		entryNames = append(entryNames, entry.Name())
 	}
 	return entryNames
+}
+
+func copy(src, dst string) (int64, error) {
+	sourceFileStat, err := os.Stat(src)
+	if err != nil {
+		return 0, err
+	}
+
+	if !sourceFileStat.Mode().IsRegular() {
+		return 0, fmt.Errorf("%s is not a regular file", src)
+	}
+
+	source, err := os.Open(src)
+	if err != nil {
+		return 0, err
+	}
+	defer source.Close()
+
+	destination, err := os.Create(dst)
+	if err != nil {
+		return 0, err
+	}
+	defer destination.Close()
+	nBytes, err := io.Copy(destination, source)
+	return nBytes, err
 }
 
 func getAllFilenames(inputDir string) []string {
@@ -84,7 +150,7 @@ func getDirnames(inputDir string) []string {
 	return dirnames
 }
 
-func combine(inputDir string, outputDir string, verbose bool) {
+func combine(inputDir string, outputDir string, method Method, followFlag bool, verbose bool) {
 	inputDirTruePath, err := filepath.EvalSymlinks(inputDir)
 	if err != nil {
 		panic(err)
@@ -108,15 +174,33 @@ func combine(inputDir string, outputDir string, verbose bool) {
 		filenames := getAllFilenames(subdirPath)
 		for _, filename := range filenames {
 			oldpath := path.Join(subdirPath, filename)
-			trueOldpath, err := filepath.EvalSymlinks(oldpath)
-			if err != nil {
-				panic(err)
+			if followFlag {
+				oldpath, err = filepath.EvalSymlinks(oldpath)
+				if err != nil {
+					panic(err)
+				}
 			}
 			newpath := path.Join(outputDir, filename)
-			if verbose {
-				fmt.Printf("%s -> %s\n", trueOldpath, newpath)
+			switch method {
+			case Move:
+				if verbose {
+					fmt.Printf("%s ~> %s\n", oldpath, newpath)
+				}
+				os.Rename(oldpath, newpath)
+			case Copy:
+				if verbose {
+					fmt.Printf("%s => %s\n", oldpath, newpath)
+				}
+				copy(oldpath, newpath)
+			case Link:
+				if verbose {
+					fmt.Printf("%s -> %s\n", oldpath, newpath)
+				}
+				os.Symlink(oldpath, newpath)
+			default:
+				err = fmt.Errorf("Unknown method '%s'", method)
+				panic(err)
 			}
-			os.Symlink(trueOldpath, newpath)
 		}
 	}
 }
