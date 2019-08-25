@@ -167,6 +167,11 @@ func getDirnames(inputDir string, hiddenFlag bool) []string {
 	return dirnames
 }
 
+type LinkSpec struct {
+	Oldpath string
+	Newpath string
+}
+
 func combine(inputDir string, outputDir string, method Method, followFlag bool, hiddenFlag bool, dryRunFlag bool, verbose bool) {
 	if dryRunFlag {
 		fmt.Println("DRY RUN")
@@ -189,6 +194,7 @@ func combine(inputDir string, outputDir string, method Method, followFlag bool, 
 		panic(err)
 	}
 
+	var allLinkSpecs []LinkSpec
 	for _, subdirname := range subdirnames {
 		subdirPath := path.Join(inputDirAbsPath, subdirname)
 		filenames := getAllFilenames(subdirPath)
@@ -201,32 +207,36 @@ func combine(inputDir string, outputDir string, method Method, followFlag bool, 
 				}
 			}
 			newpath := path.Join(outputDir, filename)
-			switch method {
-			case Move:
-				if verbose {
-					fmt.Printf("%s ~> %s\n", oldpath, newpath)
-				}
-				if !dryRunFlag {
-					os.Rename(oldpath, newpath)
-				}
-			case Copy:
-				if verbose {
-					fmt.Printf("%s => %s\n", oldpath, newpath)
-				}
-				if !dryRunFlag {
-					copyFile(oldpath, newpath)
-				}
-			case Link:
-				if verbose {
-					fmt.Printf("%s -> %s\n", oldpath, newpath)
-				}
-				if !dryRunFlag {
-					os.Symlink(oldpath, newpath)
-				}
-			default:
-				err = fmt.Errorf("Unknown method '%s'", method)
-				panic(err)
+			linkSpec := LinkSpec{oldpath, newpath}
+			allLinkSpecs = append(allLinkSpecs, linkSpec)
+		}
+	}
+	for _, linkSpec := range allLinkSpecs {
+		switch method {
+		case Move:
+			if verbose {
+				fmt.Printf("%s ~> %s\n", linkSpec.Oldpath, linkSpec.Newpath)
 			}
+			if !dryRunFlag {
+				os.Rename(linkSpec.Oldpath, linkSpec.Newpath)
+			}
+		case Copy:
+			if verbose {
+				fmt.Printf("%s => %s\n", linkSpec.Oldpath, linkSpec.Newpath)
+			}
+			if !dryRunFlag {
+				copyFile(linkSpec.Oldpath, linkSpec.Newpath)
+			}
+		case Link:
+			if verbose {
+				fmt.Printf("%s -> %s\n", linkSpec.Oldpath, linkSpec.Newpath)
+			}
+			if !dryRunFlag {
+				os.Symlink(linkSpec.Oldpath, linkSpec.Newpath)
+			}
+		default:
+			err = fmt.Errorf("Unknown method '%s'", method)
+			panic(err)
 		}
 	}
 }
