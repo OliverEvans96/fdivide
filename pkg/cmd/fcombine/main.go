@@ -22,6 +22,8 @@ Options:
     --copy               Copy files
     --move               Move files
     --follow             Follow symlinks to source
+    --hidden-dirs        Include dirs beginning with "." - excluded by default
+    --dry-run, -n        Don't actually perform any operations, only print statements
     --verbose, -v        Verbose logging
 `
 
@@ -70,13 +72,21 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	hiddenFlag, err := opts.Bool("--hidden-dirs")
+	if err != nil {
+		panic(err)
+	}
+	dryRunFlag, err := opts.Bool("--dry-run")
+	if err != nil {
+		panic(err)
+	}
 
 	verbose, err := opts.Bool("--verbose")
 	if err != nil {
 		panic(err)
 	}
 
-	combine(inputDir, outputDir, method, followFlag, verbose)
+	combine(inputDir, outputDir, method, followFlag, hiddenFlag, dryRunFlag, verbose)
 }
 
 func ls(dirPath string) []string {
@@ -91,7 +101,7 @@ func ls(dirPath string) []string {
 	return entryNames
 }
 
-func copy(src, dst string) (int64, error) {
+func copyFile(src, dst string) (int64, error) {
 	sourceFileStat, err := os.Stat(src)
 	if err != nil {
 		return 0, err
@@ -133,7 +143,11 @@ func getAllFilenames(inputDir string) []string {
 	return allFilenames
 }
 
-func getDirnames(inputDir string) []string {
+func startswith(s string, r rune) bool {
+	return rune(s[0]) == r
+}
+
+func getDirnames(inputDir string, hiddenFlag bool) []string {
 	entryNames := ls(inputDir)
 	var dirnames []string
 	for _, entryName := range entryNames {
@@ -144,13 +158,19 @@ func getDirnames(inputDir string) []string {
 			panic(err)
 		}
 		if entryInfo.IsDir() {
-			dirnames = append(dirnames, entryInfo.Name())
+			name := entryInfo.Name()
+			if !startswith(name, '.') || hiddenFlag {
+				dirnames = append(dirnames, name)
+			}
 		}
 	}
 	return dirnames
 }
 
-func combine(inputDir string, outputDir string, method Method, followFlag bool, verbose bool) {
+func combine(inputDir string, outputDir string, method Method, followFlag bool, hiddenFlag bool, dryRunFlag bool, verbose bool) {
+	if dryRunFlag {
+		fmt.Println("DRY RUN")
+	}
 	inputDirTruePath, err := filepath.EvalSymlinks(inputDir)
 	if err != nil {
 		panic(err)
@@ -159,7 +179,7 @@ func combine(inputDir string, outputDir string, method Method, followFlag bool, 
 	if err != nil {
 		panic(err)
 	}
-	subdirnames := getDirnames(inputDirAbsPath)
+	subdirnames := getDirnames(inputDirAbsPath, hiddenFlag)
 	if err != nil {
 		panic(err)
 	}
@@ -186,17 +206,23 @@ func combine(inputDir string, outputDir string, method Method, followFlag bool, 
 				if verbose {
 					fmt.Printf("%s ~> %s\n", oldpath, newpath)
 				}
-				os.Rename(oldpath, newpath)
+				if !dryRunFlag {
+					os.Rename(oldpath, newpath)
+				}
 			case Copy:
 				if verbose {
 					fmt.Printf("%s => %s\n", oldpath, newpath)
 				}
-				copy(oldpath, newpath)
+				if !dryRunFlag {
+					copyFile(oldpath, newpath)
+				}
 			case Link:
 				if verbose {
 					fmt.Printf("%s -> %s\n", oldpath, newpath)
 				}
-				os.Symlink(oldpath, newpath)
+				if !dryRunFlag {
+					os.Symlink(oldpath, newpath)
+				}
 			default:
 				err = fmt.Errorf("Unknown method '%s'", method)
 				panic(err)
