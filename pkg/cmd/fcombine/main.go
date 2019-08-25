@@ -184,6 +184,14 @@ func combine(inputDir string, outputDir string, method Method, followFlag bool, 
 	if err != nil {
 		panic(err)
 	}
+	outputDirTruePath, err := filepath.EvalSymlinks(outputDir)
+	if err != nil {
+		panic(err)
+	}
+	outputDirAbsPath, err := filepath.Abs(outputDirTruePath)
+	if err != nil {
+		panic(err)
+	}
 	subdirnames := getDirnames(inputDirAbsPath, hiddenFlag)
 	if err != nil {
 		panic(err)
@@ -197,6 +205,10 @@ func combine(inputDir string, outputDir string, method Method, followFlag bool, 
 	var allLinkSpecs []LinkSpec
 	for _, subdirname := range subdirnames {
 		subdirPath := path.Join(inputDirAbsPath, subdirname)
+		// Ignore outputDir (only relevent if it's a subdirectory of inputDir)
+		if subdirPath == outputDirAbsPath {
+			continue
+		}
 		filenames := getAllFilenames(subdirPath)
 		for _, filename := range filenames {
 			oldpath := path.Join(subdirPath, filename)
