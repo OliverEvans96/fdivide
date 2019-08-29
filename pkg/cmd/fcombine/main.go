@@ -13,12 +13,12 @@ import (
 
 const usage string = `fcombine
 Combine files from sibiling subdirectories into a single output directory using symlinks.
+Symlinks are created by default, but files can also be moved or copied using the flags.
 
 Usage:
-    fcombine [--link | --copy | --move] <input-parent-dir> <output-dir> [options]
+    fcombine <input-parent-dir> <output-dir> [options]
 
 Options:
-    --link               Link files (default)
     --copy               Copy files
     --move               Move files
     --follow             Follow symlinks to source
@@ -53,6 +53,11 @@ func main() {
 	var method Method
 	if copyFlag {
 		method = Copy
+		if moveFlag {
+			err := fmt.Errorf("at most one of [--copy,--move] may be given")
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
 	} else if moveFlag {
 		method = Move
 	} else {
