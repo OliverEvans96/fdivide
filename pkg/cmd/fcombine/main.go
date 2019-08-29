@@ -181,6 +181,10 @@ func combine(inputDir string, outputDir string, method Method, followFlag bool, 
 	if dryRunFlag {
 		fmt.Println("DRY RUN")
 	}
+	err := os.MkdirAll(outputDir, 0755)
+	if err != nil {
+		panic(err)
+	}
 	inputDirTruePath, err := filepath.EvalSymlinks(inputDir)
 	if err != nil {
 		panic(err)
@@ -198,11 +202,6 @@ func combine(inputDir string, outputDir string, method Method, followFlag bool, 
 		panic(err)
 	}
 	subdirnames := getDirnames(inputDirAbsPath, hiddenFlag)
-	if err != nil {
-		panic(err)
-	}
-
-	err = os.MkdirAll(outputDir, 0755)
 	if err != nil {
 		panic(err)
 	}
