@@ -214,15 +214,22 @@ func combine(options FcombineOptions) {
 	if err != nil {
 		panic(err)
 	}
-	inputDirTruePath, err := filepath.EvalSymlinks(options.InputDir)
-	if err != nil {
-		panic(err)
+	var inputDirTruePath string
+	var outputDirTruePath string
+	if options.Follow {
+		inputDirTruePath, err = filepath.EvalSymlinks(options.InputDir)
+		if err != nil {
+			panic(err)
+		}
+		outputDirTruePath, err = filepath.EvalSymlinks(options.OutputDir)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		inputDirTruePath = options.InputDir
+		outputDirTruePath = options.OutputDir
 	}
 	inputDirAbsPath, err := filepath.Abs(inputDirTruePath)
-	if err != nil {
-		panic(err)
-	}
-	outputDirTruePath, err := filepath.EvalSymlinks(options.OutputDir)
 	if err != nil {
 		panic(err)
 	}
