@@ -259,9 +259,9 @@ func combine(options FcombineOptions) {
 	}
 	// Get files if desired
 	if options.IncludeFiles {
-		filenames := getAllFilenames(options.InputDir)
+		filenames := getAllFilenames(inputDirAbsPath)
 		for _, filename := range filenames {
-			oldpath := path.Join(options.InputDir, filename)
+			oldpath := path.Join(inputDirAbsPath, filename)
 			if options.Follow {
 				oldpath, err = filepath.EvalSymlinks(oldpath)
 				if err != nil {
