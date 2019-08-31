@@ -22,6 +22,7 @@ Options:
     --copy               Copy files
     --move               Move files
     --follow             Follow symlinks to source
+    --include-files      Also transfer non-directory files in <input-parent-dir> to <output-dir>
     --hidden-dirs        Include dirs beginning with "." - excluded by default
     --dry-run, -n        Don't actually perform any operations, only print statements
     --verbose, -v        Verbose logging
@@ -35,7 +36,23 @@ const (
 	Move Method = "Move"
 )
 
+type FcombineOptions struct {
+	InputDir     string
+	OutputDir    string
+	Method       Method
+	Follow       bool
+	IncludeFiles bool
+	HiddenDirs   bool
+	DryRun       bool
+	Verbose      bool
+}
+
 func main() {
+	options := getOptions()
+	combine(options)
+}
+
+func getOptions() FcombineOptions {
 	opts, err := docopt.ParseDoc(usage)
 	if err != nil {
 		panic(err)
@@ -64,6 +81,10 @@ func main() {
 		method = Link
 	}
 
+	includeFilesFlag, err := opts.Bool("--include-files")
+	if err != nil {
+		panic(err)
+	}
 	inputDir, err := opts.String("<input-parent-dir>")
 	if err != nil {
 		panic(err)
@@ -77,7 +98,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	hiddenFlag, err := opts.Bool("--hidden-dirs")
+	hiddenDirsFlag, err := opts.Bool("--hidden-dirs")
 	if err != nil {
 		panic(err)
 	}
@@ -85,13 +106,21 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
 	verbose, err := opts.Bool("--verbose")
 	if err != nil {
 		panic(err)
 	}
 
-	combine(inputDir, outputDir, method, followFlag, hiddenFlag, dryRunFlag, verbose)
+	return FcombineOptions{
+		InputDir:     inputDir,
+		OutputDir:    outputDir,
+		Method:       method,
+		Follow:       followFlag,
+		IncludeFiles: includeFilesFlag,
+		HiddenDirs:   hiddenDirsFlag,
+		DryRun:       dryRunFlag,
+		Verbose:      verbose,
+	}
 }
 
 func ls(dirPath string) []string {
@@ -177,15 +206,15 @@ type LinkSpec struct {
 	Newpath string
 }
 
-func combine(inputDir string, outputDir string, method Method, followFlag bool, hiddenFlag bool, dryRunFlag bool, verbose bool) {
-	if dryRunFlag {
+func combine(options FcombineOptions) {
+	if options.DryRun {
 		fmt.Println("DRY RUN")
 	}
-	err := os.MkdirAll(outputDir, 0755)
+	err := os.MkdirAll(options.OutputDir, 0755)
 	if err != nil {
 		panic(err)
 	}
-	inputDirTruePath, err := filepath.EvalSymlinks(inputDir)
+	inputDirTruePath, err := filepath.EvalSymlinks(options.InputDir)
 	if err != nil {
 		panic(err)
 	}
@@ -193,7 +222,7 @@ func combine(inputDir string, outputDir string, method Method, followFlag bool, 
 	if err != nil {
 		panic(err)
 	}
-	outputDirTruePath, err := filepath.EvalSymlinks(outputDir)
+	outputDirTruePath, err := filepath.EvalSymlinks(options.OutputDir)
 	if err != nil {
 		panic(err)
 	}
@@ -201,57 +230,75 @@ func combine(inputDir string, outputDir string, method Method, followFlag bool, 
 	if err != nil {
 		panic(err)
 	}
-	subdirnames := getDirnames(inputDirAbsPath, hiddenFlag)
+	subdirnames := getDirnames(inputDirAbsPath, options.HiddenDirs)
 	if err != nil {
 		panic(err)
 	}
 
 	var allLinkSpecs []LinkSpec
+	// Get dirs to combine
 	for _, subdirname := range subdirnames {
 		subdirPath := path.Join(inputDirAbsPath, subdirname)
-		// Ignore outputDir (only relevent if it's a subdirectory of inputDir)
+		// Ignore options.OutputDir (only relevent if it's a subdirectory of options.InputDir)
 		if subdirPath == outputDirAbsPath {
 			continue
 		}
 		filenames := getAllFilenames(subdirPath)
 		for _, filename := range filenames {
 			oldpath := path.Join(subdirPath, filename)
-			if followFlag {
+			if options.Follow {
 				oldpath, err = filepath.EvalSymlinks(oldpath)
 				if err != nil {
 					panic(err)
 				}
 			}
-			newpath := path.Join(outputDir, filename)
+			newpath := path.Join(options.OutputDir, filename)
 			linkSpec := LinkSpec{oldpath, newpath}
 			allLinkSpecs = append(allLinkSpecs, linkSpec)
 		}
 	}
+	// Get files if desired
+	if options.IncludeFiles {
+		filenames := getAllFilenames(options.InputDir)
+		for _, filename := range filenames {
+			oldpath := path.Join(options.InputDir, filename)
+			if options.Follow {
+				oldpath, err = filepath.EvalSymlinks(oldpath)
+				if err != nil {
+					panic(err)
+				}
+			}
+			newpath := path.Join(options.OutputDir, filename)
+			linkSpec := LinkSpec{oldpath, newpath}
+			allLinkSpecs = append(allLinkSpecs, linkSpec)
+		}
+	}
+	// Perform file transfer
 	for _, linkSpec := range allLinkSpecs {
-		switch method {
+		switch options.Method {
 		case Move:
-			if verbose {
+			if options.Verbose {
 				fmt.Printf("%s ~> %s\n", linkSpec.Oldpath, linkSpec.Newpath)
 			}
-			if !dryRunFlag {
+			if !options.DryRun {
 				os.Rename(linkSpec.Oldpath, linkSpec.Newpath)
 			}
 		case Copy:
-			if verbose {
+			if options.Verbose {
 				fmt.Printf("%s => %s\n", linkSpec.Oldpath, linkSpec.Newpath)
 			}
-			if !dryRunFlag {
+			if !options.DryRun {
 				copyFile(linkSpec.Oldpath, linkSpec.Newpath)
 			}
 		case Link:
-			if verbose {
+			if options.Verbose {
 				fmt.Printf("%s -> %s\n", linkSpec.Oldpath, linkSpec.Newpath)
 			}
-			if !dryRunFlag {
+			if !options.DryRun {
 				os.Symlink(linkSpec.Oldpath, linkSpec.Newpath)
 			}
 		default:
-			err = fmt.Errorf("Unknown method '%s'", method)
+			err = fmt.Errorf("Unknown method '%s'", options.Method)
 			panic(err)
 		}
 	}
